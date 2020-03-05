@@ -1,7 +1,7 @@
 ---
 title: "ML_template"
 author: "Korean Data Team"
-date: "2020-03-04"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
     theme: cerulean
@@ -21,81 +21,124 @@ output:
 <!-- EDA structure, type, missing portion -->
 <!-- Feature Engineering Wranglization -->
 
-# 1. Objective of analysis
+# 1. Objectives
 
-### a. Use this packages.
+* 
+* 
+*
+
+## a. Load Packages
 ```{r load_library, eval=FALSE, include=TRUE}
 # Load the Packages
-library(data.table)
-library(janitor)
+
+# loading package
 library(tidyverse)
+library(data.table)
+
+# clean columns
+library(janitor)
+
+# EDA
 library(DataExplorer)
 library(naniar)
 library(skimr)
+
+# Visualization 
 library(plotly)
 library(corrplot)
 library(DT)
-library(caret)
-library(stringi)
-library(lubridate)
-library(gridExtra)
 library(ggrepel)
-library(caret)
 library(corrplot)
+library(gridExtra)
+
+# Feature Engineering
+library(stringr)
+library(lubridate)
+
+
+# Machine Learning
+library(caret)
+library(xgboost)
 library(rattle)
 
 # Instant load the packages
-pacman::p_load(data.table, janitor, tidyverse, DataExplorer, naniar, skimr, plotly, corrplot, DT, caret, stringi, lubridate, gridExtra, ggrepel, caret, corrplot, rattle)
+pacman::p_load(data.table, janitor, tidyverse, DataExplorer, naniar, skimr, plotly, corrplot, DT, gridExtra, ggrepel, stringi, lubridate, caret, xgboost, rattle)
 ```
 
-### b. Load the data
+## b. Load the data
 ```{r load_data, eval=FALSE, include=TRUE}
 # Clean the name of variables (lower.case & '_' connection) by using Janitor package
 
 # Method 1
-data <- fread('url', stringsAsFactors = F) %>% clean_names()
+train <- fread(file = "url", stringsAsFactors = F, na.strings= c("NA","")) %>% clean_names()
 
 # Method 2
-data <- read.csv("url", header = TRUE) %>% clean_names()
+test <- read_csv(file = "url", header = TRUE, na = c("NA", ""), n_max = Inf, guess_max = min(1000, n_max)) %>% clean_names()
 
+test$target <- NA
+
+dat <- rbind(train, test)
 ```
 
+## c. Load Multiple files in one directory
+```{r load_multi, eval=FALSE, include= TRUE}
+file_list <- sapply("directory",function(x){list.files(x,pattern = "csv")})
+for (i in file_list){
+  assign(str_extract(i, "[a-z|A-Z|_]+(?=\\.)"), fread(i, stringsAsFactors = F, na.strings= c("NA","")))
+}
+```
 
 # 2. EDA (Expolatory Data Analysis)
 
-### a. Scales of data - Insert your data
+## a. Scales of data 
 
 ```{r attr_data, eval=FALSE, include=TRUE}
 # ncol() | nrow()
-cat("The 'data1' has", dim(data1)[1], "rows and", dim(data1)[2], "columns."
-    "\n The 'data2' has",dim(data2)[1], "rows and", dim(data2)[2], "columns.")
+cat("Train dataset' has", dim(train)[1], "rows and", dim(train)[2], "columns."
+    "\n Test dataset has",dim(test)[1], "rows and", dim(test)[2], "columns.")
 ```
 
+## b. Structure of data
 
-### b. Type of variables 
+```{r str_data, eval = F, include = TRUE}
+for (i in c(train, test)) {
+  str(i)
+  summary(i)
+  glimpse(i)
+  # skimr package
+  skim_tee(i)
+}
+```
+
+## b. Type of variables 
 
 ```{r summary_data, eval=FALSE, include=TRUE}
-lapply(c(data1, data2), typeof) %>% data.frame() %>%  t() %>%  as.data.frame() 
+lapply(dat, typeof) %>% data.frame() %>%  t() %>%  as.data.frame() 
 ```
 
 
-### c. How many missing values for each dataset?
+## c. How many missing values for each dataset?
 
 ```{r missing_transform, eval=FALSE, include=TRUE}
-# missing_transform
-data1 <- sapply(data1, function(x) {ifelse(is.character(x) & nchar(x) == 0, NA, x)}) %>% data.frame(stringsAsFactors = F) # Careful to not use as.data.frame()
-data2 <- sapply(data2, function(x) {ifelse(is.character(x) & nchar(x) == 0, NA, x)}) %>% data.frame(stringsAsFactors = F)
+# missing_transform (optional)
+# dat <- sapply(dat, function(x) {ifelse(is.character(x) & nchar(x) == 0, NA, x)}) %>% data.frame(stringsAsFactors = F) 
+# Careful to not use as.data.frame()
+```
+
+```{r missing_table}
+colSums(is.na(train)) %>% data.frame()
+colSums(is.na(test)) %>% data.frame()
 ```
 
 ```{r show_missing_value, fig.show = 'hide', eval=FALSE, include=TRUE}
 # Show missing value - visualization
-missing_data1 <- plot_missing(data1, missing_only = T, theme_config = list(legend.position = "right"), ggtheme = theme_light(), title = "data1 missing") %>% ggplotGrob()
-missing_data2 <- plot_missing(data2, theme_config = list(legend.position = "right"), ggtheme = theme_light(), title = "data2 missing") %>% ggplotGrob()
+missing_train <- plot_missing(train, missing_only = T, theme_config = list(legend.position = "right"), ggtheme = theme_light(), title = "Train missing") %>% ggplotGrob()
+missing_test <- plot_missing(test, theme_config = list(legend.position = "right"), ggtheme = theme_light(), title = "Test missing") %>% ggplotGrob()
 ```
 
 ```{r missing_result, fig.height= 6, eval=FALSE, include=TRUE}
 # Show missing result by using grid
-grid.arrange(missing_data1, missing_data2, ncol = 1)
+grid.arrange(missing_train, missing_test, ncol = 1)
 ```
 
 - The missing plot per variable can be created with $naniar$ Package as well below
@@ -104,8 +147,8 @@ grid.arrange(missing_data1, missing_data2, ncol = 1)
 
 ```{r nanair_1, eval=FALSE, include=TRUE}
 # Show missing values by using naniar package
-gmv1 <- naniar::gg_miss_var(data1, show_pct = T)
-gmv2 <- naniar::gg_miss_var(data2, show_pct = T)
+gmv1 <- naniar::gg_miss_var(train, show_pct = T)
+gmv2 <- naniar::gg_miss_var(test, show_pct = T)
 grid.arrange(gmv1, gmv2, nrow = 1)
 ```
 
@@ -113,25 +156,45 @@ grid.arrange(gmv1, gmv2, nrow = 1)
 
 ```{r nanair_2, fig.height= 10, eval=FALSE, include=TRUE}
 # Show missing values by using naniar package (Not recommended)
-m1 <- naniar::vis_miss(data1, warn_large_data = F) + labs(title = "data1 missing")
-m2 <- naniar::vis_miss(data2, warn_large_data = F) + labs(title = "data2 missing")
+m1 <- naniar::vis_miss(train, warn_large_data = F) + labs(title = "train missing")
+m2 <- naniar::vis_miss(test, warn_large_data = F) + labs(title = "test missing")
 grid.arrange(m1, m2, ncol = 1)
 ```
 
+- Here is own created missing viz method
 
-### d. Switching original continous features to any datatype(i.e. numeric, characater, date, ...) value
+```{r missing_viz}
+missing_clock_plot <-  function(x){
+  colSums(is.na(x)) %>% 
+    data.frame() %>% 
+    rownames_to_column() %>%
+    mutate(pct = ./nrow(x)) %>% 
+    ggplot(aes(x = rowname, y = .)) +
+    geom_text(aes(label = ifelse(pct == 0, "", paste(round(pct,2) * 100,"%")), size = 5), show.legend = F) +
+    geom_bar(stat = "identity", fill = "red", alpha = 0.5) +
+    coord_polar(theta = "x") +
+    labs(x = "Missing number", y = "Variables", title = "Missing Value per Variable") +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank(), axis.text.y = element_blank(), axis.text.x = element_text(size = 10, family = "sans"))
+}
 
-```{r numeric, eval=FALSE, include=TRUE}
+missing_clock_plot(train)
+missing_clock_plot(test)
+```
+
+## d. Switching original features to any datatype(i.e. numeric, characater, date, ...) value with condition (mutate_at)
+
+```{r type_switch, eval=FALSE, include=TRUE}
 # Using mutate_at
-data1 <- data1 %>% mutate_at(colnames(data1) %>% grep("gpa|act|credits", ., value =T), as.numeric)
-data2 <- data2 %>% mutate(total_meeting_duration = total_meeting_duration %>% as.numeric())
+# train <- train %>% mutate_at(colnames(data1) %>% grep("gpa|act|credits", ., value =T), as.numeric)
+# test <- test %>% mutate(total_meeting_duration = total_meeting_duration %>% as.numeric())
 
-t1 <- data1 %>% select_if(is.numeric) %>% colnames() %>% data.frame() 
-t2 <- data2 %>% select_if(is.numeric) %>% colnames() %>% data.frame()
+t1 <- train %>% select_if(is.numeric) %>% colnames() %>% data.frame() 
+t2 <- test %>% select_if(is.numeric) %>% colnames() %>% data.frame()
 rbind(t1, t2) %>% mutate(type = "Numeric") # Create 'type' column
 ```
 
-### e. DataExplorer Package 
+## e. DataExplorer Package 
 
 ```{r DE, fig.show = 'hide', eval=FALSE, include=TRUE}
 # DataExplor package - numeric variable & categorical variable & row & column
@@ -139,8 +202,8 @@ t1 <- DataExplorer::introduce(data1) %>% t() %>% as.data.frame() %>% rownames_to
 t2 <- DataExplorer::introduce(data2) %>% t() %>% as.data.frame() %>% rownames_to_column("attribute")
 
 # DataExplor package - Visualization
-p1 <- DataExplorer::plot_intro(data1, title = "data1", ggtheme = theme_bw())
-p2 <- DataExplorer::plot_intro(data2, title = "data2", ggtheme = theme_bw())
+p1 <- DataExplorer::plot_intro(data1, title = "train", ggtheme = theme_bw())
+p2 <- DataExplorer::plot_intro(data2, title = "test", ggtheme = theme_bw())
 ```
 
 ```{r DE_result,  fig.height= 6, fig.width=  10, eval=FALSE, include=TRUE}
@@ -149,36 +212,43 @@ grid.arrange(p1, tableGrob(t1, rows=NULL), tableGrob(t2, rows=NULL), p2,  ncol =
 ```
 
 
+# 3. Feature Engineering 
+## (Feature selection, Imputation, Visualization)
 
-# 3. Feature Engineering (Feature selection, Imputation, Visualization)
+## a. Feature Selction
 
-### a. data1 & data2 Joining key
+1. method 1 - Correlation plot
+
+```{r cor}
+cor <- cor(train %>% select_if(is.numeric))
+corrplot(cor, method = c("number"), type = "upper", tl.col = "black", diag = T)
+```
+## a. data1 & data2 Joining key
 
 ```{r joining, eval=FALSE, include=TRUE}
+# without function
 joining_key <- data1[,which(colnames(data1) %in% colnames(data2))] %>% colnames()
 
 join_data <- 
-  left_join(data2, data1, by = joining_key)
+  left_join(data1, data2, by = joining_key)
+
+# with function (natural join)
+natural_join <- function(x,y){
+  x %>% left_join(y, by = x[,which(colnames(x) %in% colnames(y))] %>% colnames())
+}
+
+join_data <-
+  data1 %>% natural_join(data2)
+
 
 # datatable(join_data %>% head(100), options = list(scrollX = T))
 ```
 
-### b. 'target column' (Target)
+## b. Target Exploration
 
-__Before__
-```{r join_data, eval=FALSE, include=TRUE}
-join_data %>% group_by('target column') %>% tally() 
+```{r target, eval=FALSE, include=TRUE}
+join_data %>% group_by('target column') %>% tally() %>% mutate(pct = n/sum(n))
 ```
-
-__After__
-```{r join_data2, eval=FALSE, include=TRUE}
-join_data <- join_data %>% mutate('target column' = ifelse(str_detect('target column',"Graduated"), "Graduated", "Not Graduated"))
-
-join_data$'target column' %>% unique()
-```
-
-
-
 
 # 4. Machine Learning
 
@@ -186,7 +256,7 @@ join_data$'target column' %>% unique()
 ## 1. Target Distribution
 
 ```{r taget, eval=FALSE, include=TRUE}
-proportion <- advising_student_final %>% group_by(enrollment_status) %>% count() %>% ungroup() %>%  mutate(pct = round(n/sum(n),2))
+proportion <- dat %>% group_by(target) %>% tally() %>%  mutate(pct = round(n/sum(n),2))
 proportion
 ```
 
@@ -194,8 +264,7 @@ proportion
 ## 2. Identify the missing variables and impute the part (median)
 
 ```{r missing_impute, warning = F, eval=FALSE, include=TRUE}
-naniar::gg_miss_var(advising_student_final, show_pct = T)
-# naniar::gg_miss_fct(advising_student_final, enrollment_status)
+naniar::gg_miss_var(dat, show_pct = T)
 
 # advising_student_final %>% ggplot() +
 #   geom_histogram(aes(x = act_composite, fill = enrollment_status)) +
@@ -207,17 +276,16 @@ naniar::gg_miss_var(advising_student_final, show_pct = T)
 #   facet_wrap(~ enrollment_status) +
 #   theme_minimal()
 
-advising_student_final %>% group_by(enrollment_status) %>% summarise(act_median = median(act_composite, na.rm = T), hs_gpa_median = median(high_school_gpa, na.rm = T))
+# advising_student_final %>% group_by(enrollment_status) %>% summarise(act_median = median(act_composite, na.rm = T), hs_gpa_median = median(high_school_gpa, na.rm = T))
+# 
+# advising_student_final[advising_student_final$enrollment_status == "Graduated" & is.na(advising_student_final$act_composite),"act_composite"] <- 22
+# advising_student_final[advising_student_final$enrollment_status == "Not Graduated" & is.na(advising_student_final$act_composite),"act_composite"] <- 22
+# advising_student_final[advising_student_final$enrollment_status == "Graduated" & is.na(advising_student_final$high_school_gpa),"high_school_gpa"] <- 3.46
+# advising_student_final[advising_student_final$enrollment_status == "Not Graduated" & is.na(advising_student_final$high_school_gpa),"high_school_gpa"] <- 3.24
 
-advising_student_final[advising_student_final$enrollment_status == "Graduated" & is.na(advising_student_final$act_composite),"act_composite"] <- 22
-advising_student_final[advising_student_final$enrollment_status == "Not Graduated" & is.na(advising_student_final$act_composite),"act_composite"] <- 22
-advising_student_final[advising_student_final$enrollment_status == "Graduated" & is.na(advising_student_final$high_school_gpa),"high_school_gpa"] <- 3.46
-advising_student_final[advising_student_final$enrollment_status == "Not Graduated" & is.na(advising_student_final$high_school_gpa),"high_school_gpa"] <- 3.24
-
-
-advising_student_final <- advising_student_final %>% mutate_if(is.character, as.factor) %>% mutate_if(is.logical, as.factor) %>% select(-c(identifier))
-
-sapply(advising_student_final, class)
+# advising_student_final <- advising_student_final %>% mutate_if(is.character, as.factor) %>% mutate_if(is.logical, as.factor) %>% select(-c(identifier))
+ 
+# sapply(advising_student_final, class)
 
 naniar::gg_miss_var(advising_student_final, show_pct = T)
 ```
