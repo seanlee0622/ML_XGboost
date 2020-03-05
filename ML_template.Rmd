@@ -55,6 +55,9 @@ library(gridExtra)
 library(stringr)
 library(lubridate)
 
+# Feature Selection
+library(Boruta)
+
 
 # Machine Learning
 library(caret)
@@ -106,18 +109,23 @@ for (i in c(train, test)) {
   summary(i)
   glimpse(i)
   # skimr package
-  skim_tee(i)
+  skim(i)
 }
 ```
 
-## b. Type of variables 
+## c. Type of variables 
 
 ```{r summary_data, eval=FALSE, include=TRUE}
 lapply(dat, typeof) %>% data.frame() %>%  t() %>%  as.data.frame() 
 ```
 
 
-## c. How many missing values for each dataset?
+## d. missing value 
+
+code below is needless when 
+
+  1. $ na.strings= c("NA","")) $ is used for $fread$ function and 
+  2. $ na = c("NA", "") $ is used for $read\_csv$ function.
 
 ```{r missing_transform, eval=FALSE, include=TRUE}
 # missing_transform (optional)
@@ -213,17 +221,56 @@ grid.arrange(p1, tableGrob(t1, rows=NULL), tableGrob(t2, rows=NULL), p2,  ncol =
 
 
 # 3. Feature Engineering 
-## (Feature selection, Imputation, Visualization)
 
-## a. Feature Selction
+Sequences
 
-1. method 1 - Correlation plot
+1. Feature Exploation (Data Visulaization)
+2. Wraglization
+3. Feature selection 
+4. Imputation
 
-```{r cor}
-cor <- cor(train %>% select_if(is.numeric))
-corrplot(cor, method = c("number"), type = "upper", tl.col = "black", diag = T)
+## a. Feature Exploration
+
+1. ggplot containing table
+
+```{r plot_table_inside, eval=FALSE, include=TRUE}
+# t1 <- advising_student_fs %>% 
+#   group_by(enrollment_status) %>% 
+#   summarise(mean = mean(sum_of_cumulative_missing_credit, na.rm = T)) 
+# 
+# advising_student_fs %>% 
+#   ggplot(aes(x = enrollment_status, y = sum_of_cumulative_missing_credit)) +
+#   geom_jitter(alpha = 0.3, color = "gray") +
+#   geom_violin(aes(fill = enrollment_status)) +
+#   theme_minimal() +
+#   theme(legend.position = "none") +
+#   coord_flip() +
+#   annotation_custom(tableGrob(t1, rows = NULL), xmin= 0.5, xmax=  1 , ymin= 50 , ymax= 60)
 ```
-## a. data1 & data2 Joining key
+
+2. alluvium plot
+
+```{r alluvium_viz}
+# titanic %>% group_by(sex, age_group, survived) %>% tally() %>% 
+#   ggplot(data= . , aes(axis1 = sex, axis2 = age_group, axis3 = survived, y = n)) +
+#   geom_alluvium(aes(fill = survived), width = 0, knot.pos = 0) +
+#   guides(fill = F) +
+#   geom_stratum(width = 0.1, infer.label = T) +
+#   geom_label(stat = "stratum", infer.label = T) +
+#   scale_x_continuous(breaks = c(1,2,3) , labels = c("sex", "age group", "survived")) +
+#   theme_minimal()
+```
+
+3. proportion table
+
+```{r prop_table}
+# prop.table(table(train$survived)) %>% data.frame()
+# table(advising_student_fs$enrollment_status) %>% data.frame() %>% mutate(Pct = round(Freq / sum(Freq) * 100, 2))
+```
+
+## b. Data Wraglization
+
+### 1. data1 & data2 Joining key
 
 ```{r joining, eval=FALSE, include=TRUE}
 # without function
@@ -244,27 +291,117 @@ join_data <-
 # datatable(join_data %>% head(100), options = list(scrollX = T))
 ```
 
-## b. Target Exploration
+### 2. add_count (adding variable count to orignal data frame)
 
-```{r target, eval=FALSE, include=TRUE}
-join_data %>% group_by('target column') %>% tally() %>% mutate(pct = n/sum(n))
+```{r add_count}
+dat <- dat %>% add_count(varible, name = "")
+# titanic <- titanic %>% add_count(family, name = "fam_count")
 ```
 
-# 4. Machine Learning
+### 3. Dimensional Reduction
 
+```{r dr}
+# Transform continous data to categorical factor
+dat <- dat %>% mutate(name = variable, cut(breaks = c(), labels = c()))
+# titanic <- titanic %>% mutate(age_group = age %>% cut(breaks = c(0,20,40,60,80), labels = c("minor","young adult","mid-age","aged")))
 
-## 1. Target Distribution
+# ifelse
+dat <- dat %>% mutate(name = ifelse(condition, true_value, false_value))
+# titanic <- titanic %>% 
+#   mutate(fa = ifelse(fa == "alone", "alone", "family"))
 
-```{r taget, eval=FALSE, include=TRUE}
-proportion <- dat %>% group_by(target) %>% tally() %>%  mutate(pct = round(n/sum(n),2))
-proportion
+# case_when
+dat <- dat %>% mutate(name = case_when(
+                      condition1 ~ "level1",
+                      condition2 ~ "level2",
+                      condition3 ~ "level3",
+                      TRUE ~ "level4"
+                      ))
+# titanic <-
+#   titanic %>% 
+#   mutate(fa = case_when(
+#     sib_sp + parch == 0 ~  "alone",
+#     fam_count == sib_sp + parch + 1 ~ family,
+#     related_number == sib_sp + parch + 1 ~ family,
+#     TRUE ~ "Unknown"
+#   ))
+
 ```
 
+### 4. text mining
 
-## 2. Identify the missing variables and impute the part (median)
+```{r text_mining}
+# str_detect (return TRUE, FALSE)
+# str_extract | str_extract_all
+# str_replace | str_replace_all
+# str_
+```
+
+## c. Feature Selction
+
+1. method 1 - Correlation plot
+
+```{r cor}
+cor <- cor(train %>% select_if(is.numeric))
+corrplot(cor, method = c("number"), type = "upper", tl.col = "black", diag = T)
+```
+
+2. method 2 - Boruta method
+
+```{r boruta}
+# Decide if a variable is important or not using Boruta
+boruta_output <- Boruta(survived ~ ., data=na.omit(train), doTrace=2)  # perform Boruta search
+# collect Confirmed and Tentative variables
+boruta_signif <- names(boruta_output$finalDecision[boruta_output$finalDecision %in% c("Confirmed", "Tentative")])  
+boruta_signif <- getSelectedAttributes(boruta_output, withTentative = T)
+print(boruta_signif)
+plot(boruta_output, cex.axis=.7, las=2, xlab="", main="Variable Importance")  # plot variable importance
+```
+
+3. method 3 - Recursive Feature Elimination (RFE)
+
+```{r rfe}
+set.seed(1000)
+trainControl <- rfeControl(functions = rfFuncs,
+                   method = "repeatedcv",
+                   repeats = 5,
+                   verbose = FALSE)
+
+train_model <- train %>% na.omit()
+
+lmProfile <- rfe(x= train_model, y= train_model$target,
+                 sizes = c(1,5,10,15,20),
+                 rfeControl = trainControl)
+
+lmProfile
+```
+
+## d. Imputation
+
+Improving data quality 
+
+1. Filtering missing value
+
+```{r filtering}
+# Method 1
+dat %>% na.omit() # delete entire missing value regardless of variables
+
+# Method 2
+missing_variables <- c() # Put selected variables for ML
+dat %>% drop_na(mssing_variables)
+```
+
+2. Impute missing value
+
+Median is the most frequent way to impute the missing data
+
+  - a. Identification of data
 
 ```{r missing_impute, warning = F, eval=FALSE, include=TRUE}
+# Visualize missing portion of each variables
 naniar::gg_miss_var(dat, show_pct = T)
+
+# Example
 
 # advising_student_final %>% ggplot() +
 #   geom_histogram(aes(x = act_composite, fill = enrollment_status)) +
@@ -290,195 +427,148 @@ naniar::gg_miss_var(dat, show_pct = T)
 naniar::gg_miss_var(advising_student_final, show_pct = T)
 ```
 
+  - b. Imputation median per group
+
+```{r imputation_per_group}
+# for (i in unique(titanic$title)){
+#   titanic$age[titanic$title == i & is.na(titanic$age)] <- median(titanic$age[titanic$title == i ], na.rm = T)
+# }
+```
+
+Checking before there is no NA values for each feaure we are going to use
+
+3. NA validation
+
+```{r validation}
+colSums(is.na(dat))
+```
+
+
+# 4. Machine Learning
+
+
+## a. Check Target Distribution
+
+check if target variable is balanced or not
+
+```{r taget, eval=FALSE, include=TRUE}
+proportion <- dat %>% group_by(target) %>% tally() %>%  mutate(pct = round(n/sum(n),2))
+proportion
+```
+
+## b. Split between train vs test
+
 ```{r modeling_1, eval=FALSE, include=TRUE}
+# Modeling
+features <- c()
+ml_df <- dat %>% filter(!is.na(target)) %>% select(features) 
+
 set.seed(1000)
-InTraining <- caret::createDataPartition(advising_student_final$enrollment_status, p = .7, list = F)
-Train <- advising_student_final %>% slice(InTraining)
-Test <- advising_student_final %>% slice(-InTraining)
-
-ModelFit_1 <- train(enrollment_status ~ ., data = Train, method = "rf", importance = T)
-ModelFit_2 <- train(enrollment_status ~ ., data = Train, method = "rpart")
+InTraining <- caret::createDataPartition(data$target, p = .7, list = F)
+# createFolds(train$survived, 10, list = F)
+train <- dat %>% dplyr::slice(InTraining)
+test <- dat %>% dplyr::slice(-InTraining)
 ```
 
-```{r modeling_2, fig.height= 7, eval=FALSE, include=TRUE}
-varimp1 <- ggplot(varImp(ModelFit_1)) + geom_label(aes(label = paste0(round(Importance),"%"))) + theme_bw() + labs(title = "Random Forest") + theme(plot.title = element_text(hjust = 0.5))
-varimp2 <- ggplot(varImp(ModelFit_1)) + geom_label(aes(label = paste0(round(Importance),"%"))) + theme_bw() + labs(title = "RPart") + theme(plot.title = element_text(hjust = 0.5))
-grid.arrange(varimp1, varimp2, ncol = 1)
+## c. xgboost setting
+
+```{r modeling_2, eval=FALSE, include=TRUE}
+# taget setting
+tr_label <- train$survived 
+ts_label <- test$survived 
+total_label <- ml_df$survived
+
+# model.matrix
+new_tr <- model.matrix(~.+0, data = train %>% select(-target), with = F)
+new_ts <- model.matrix(~.+0, data = test %>% select(-target), with = F)
+new_total <- model.matrix(~.+0, data = ml_df %>% select(-target), with = F)
 ```
+
 
 ```{r modeling_3, eval=FALSE, include=TRUE}
-caret::confusionMatrix(Test$enrollment_status ,predict(ModelFit_1, Test))
-caret::confusionMatrix(Test$enrollment_status ,predict(ModelFit_2, Test))
+#xgb.DMatrix
+dtrain <- xgb.DMatrix(new_tr, label = tr_label)
+dtest <- xgb.DMatrix(new_ts, label = ts_label)
+dtotal <- xgb.DMatrix(new_total, label = total_label)
 ```
 
+## d. default modeling
 
 ```{r modeling_4, eval=FALSE, include=TRUE}
-fancyRpartPlot(ModelFit_2$finalModel)
+# traincontrol : cross-validation (5 folds)
+xgb_trcontrol <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+# model without params
+xgb_model<- xgboost::xgboost(data = new_tr, 
+                    label = tr_label,
+                    verbosity = 2, 
+                    objective = "binary:logistic", 
+                    nrounds = 500, 
+                    early_stopping_rounds = 100, 
+                    trControl = xgb_trcontrol)
+
 ```
+
+## e. params modeling
 
 ```{r modeling_5, eval=FALSE, include=TRUE}
-colSums(is.na(advising_student_final))
+?xgb.train
 
-advising_student_final <- advising_student_final %>% mutate(pred = predict(ModelFit_1, advising_student_final))
+params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eta = 0.2,
+  gamma = 0.1,
+  max_depth = 6,
+  min_child_weight = 1,
+  subsample = 1,
+  colsample_bytree = 1,
+  eval_metric = "mae", # rmse, rmsle, error, mae, auc
+  scale_pos_weight = 549/342
+)
 
-confusionMatrix(advising_student_final$enrollment_status, advising_student_final$pred)
+watchlist <- list(train = dtrain, eval = dtest)
+
+xgb_model2 <- xgb.train(params = params, data= dtrain, nrounds = 500, trControl = xgb_trcontrol, watchlist = watchlist, early_stopping_rounds = 100)
 ```
 
+## f. variable importance
 
+```{r varimp}
+# variable importance
+imp_matrix <- xgb.importance (feature_names = colnames(new_tr),model = xgb_model2)
+xgb.plot.importance(imp_matrix[1:10])
 
-
-
-
-
-
-
-# * Useful Code *
-
-### round(), percentage
-
-```{r round, eval=FALSE, include=TRUE}
-table(advising_student_fs$enrollment_status) %>% data.frame() %>% mutate(Pct = round(Freq / sum(Freq) * 100, 2))
+# xgboost tree viz
+xgb.plot.tree(model = xgb_model2, trees = 0, show_node_id = TRUE)
 ```
 
+## h. validation of test 
 
-### ggplot help
+```{r valid_test}
+test <- test %>% mutate(pred_pct = predict(xgb_model, dtest), pred = ifelse(pred_pct > 0.5, 1, 0))
+test <- test %>% mutate(pred_pct2 = predict(xgb_model2, dtest), pred2 = ifelse(pred_pct2 > 0.5, 1, 0))
 
-```{r ggplot1, eval=FALSE, include=TRUE}
-t1 <- advising_student_fs %>% 
-  group_by(enrollment_status) %>% 
-  summarise(mean = mean(sum_of_cumulative_missing_credit, na.rm = T)) 
-
-advising_student_fs %>% 
-  ggplot(aes(x = enrollment_status, y = sum_of_cumulative_missing_credit)) +
-  geom_jitter(alpha = 0.3, color = "gray") +
-  geom_violin(aes(fill = enrollment_status)) +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  coord_flip() +
-  annotation_custom(tableGrob(t1, rows = NULL), xmin= 0.5, xmax=  1 , ymin= 50 , ymax= 60)
+confusionMatrix(factor(test$pred), factor(test$target))
+confusionMatrix(factor(test$pred2), factor(test$target))
 ```
 
+## i. validation of whole dataset
 
-### Lubridate::%--% = as.interval()
-
-##### Ex1
-```{r lubridate1, eval=FALSE, include=TRUE}
-fix_year <- function(x, year=1919){ #since this year is 2019, if year digits are over 19, it is regared as 1900 century.
-  m <- year(x) %% 100
-  year(x) <- ifelse(m > year %% 100, 1900+m, 2000+m)
-  x
-}
-
-advising_student_fs <-
-advising_student_fs %>% 
-  mutate(mission_enter_date = mdy(mission_enter_date) %>% fix_year(), mission_release_date = mdy(mission_release_date) %>% fix_year()) %>% 
-  mutate(served_mission = mission_enter_date %--% mission_release_date %>% as.duration()/ ddays(1)) %>% 
-  mutate(served_mission = case_when(
-    is.na(served_mission) ~ "N",
-    served_mission < 100 ~ "H",
-    TRUE ~ "F"
-  ))
+```{r valid_total}
+ml_df <- ml_df %>% mutate(pred_pct = predict(xgb_model, dtotal), pred = ifelse(pred_pct > 0.5, 1, 0))
+ml_df <- ml_df %>% mutate(pred_pct2 = predict(xgb_model2, dtotal), pred2 = ifelse(pred_pct2 > 0.5, 1, 0)))
 ```
 
-##### Ex2
-```{r lubridate2, eval=FALSE, include=TRUE}
-advising_student_fs <- 
-advising_student_fs %>% 
-  mutate(age = round(mdy(birth_date) %>% fix_year() %--% ymd(paste0(20,parse_number(term_code)), truncated = 2L) %>% as.duration() / dyears(1)))
+## j. confusionmaxtrix
+
+```{r confusion}
+confusionMatrix(factor(ml_df$pred), factor(ml_df$target)) 
+confusionMatrix(factor(ml_df$pred2), factor(ml_df$target))
 ```
 
+# 5. conclusion
 
-
-################################################
-
-## - Subprogram (Dayschool VS Online)
-
-```{r subprogram, eval=FALSE, include=TRUE}
-advising_student_fs <-
-advising_student_fs %>% 
-  mutate(subprogram = substring(subprogram,1,1))
-```
-
-- Students can be classified into in-school student (D) or online student. (O)
-
-## - Check if student transferred from other institution
-
-```{r transfer, eval=FALSE, include=TRUE}
-advising_student_fs <-
-advising_student_fs %>% 
-  mutate(transfer = ifelse(transfer_earned_credits > 0, 1, 0) %>% as.factor())
-
-advising_student_fs %>% group_by(transfer) %>% count()
-```
-
-
-## - Top 5 Major by level(degree) 
-
-```{r major, eval=FALSE, include=TRUE}
-major_fs <- advising_student_fs %>% group_by(level, major) %>% tally(sort = T)
-
-major_fs %>% group_by(level) %>% top_n(5) %>% ungroup() %>% 
-  ggplot(aes(x = parse_number(major) %>% as.factor() %>% reorder(n), y = n)) +
-  geom_col(aes(fill = level)) +
-  geom_label(aes(label = str_extract(major, "[:alpha:]+"))) +
-  facet_wrap(level ~., scales = "free", ncol = 1) +
-  coord_flip() +
-  theme_bw() +
-  labs(x = "Major", y = "Count", title = "Top 5 Major by degree") +
-  scale_fill_discrete(label = c("Assocaite", "Bachelor"))
-```
-
-## - Top 5 Advising Reason by level(degree)
-
-```{r advising_reason, fig.height= 6, fig.width= 12, eval=FALSE, include=TRUE}
-advising_reason_fs <-
-  advising_student_fs %>% group_by(level, advising_reason, enrollment_status) %>% count() %>% ungroup() %>% group_by(level, enrollment_status) %>% top_n(5, n)
-
-advising_reason_fs %>% ggplot(aes(x = reorder(advising_reason, -n), y = n)) +
-  geom_col(aes(fill = level), position = "dodge") +
-  facet_wrap( level ~ enrollment_status, scales = "free") +
-  theme_light() +
-  coord_flip() +
-  theme(legend.position = "top") +
-  labs(x = "", y = "") +
-  scale_fill_discrete(labels = c("Associate","Bachelor")) +
-  labs(caption = "We can see that Graduated Students are more likely to visit advising center with the reason of Glad Planner & Class Planning compared to others")
-```
-
-
-## - Aggregate the data group by student id (Identifier)
-
-After feature engineering, I aggregated the data by distinct Identifier to manage the individual data of each student.
-
-```{r aggregation, eval=FALSE, include=TRUE}
-advising_student_final <- 
-advising_student_fs %>% 
-  group_by(identifier) %>% 
-  arrange(cumulative_earned_credits) %>% 
-  summarise(total_meeting_duration = sum(total_meeting_duration),
-            number_of_semester = length(enrolled_current_semester[unique(term_code)] %>% str_detect("T")) ,
-            classification_begin = head(classification_begin,1),
-            served_mission = head(served_mission,1),
-            subprogram = head(subprogram,1),
-            gender = head(gender, 1),
-            act_composite = mean(act_composite),
-            high_school_gpa = mean(high_school_gpa),
-            level = head(level, 1),
-            cumulative_gpa = tail(cumulative_gpa, 1),
-            transfer = head(transfer, 1),
-            age = round(mean(age)),
-            cumulative_earned_credits = head(cumulative_earned_credits, 1),
-            cumulative_attempted_credits = head(cumulative_attempted_credits, 1),
-            cumulative_missing_credit = round(max(cumulative_attempted_credits) - (max(cumulative_earned_credits) - head(transfer_earned_credits,1)),2),
-            cumulative_campus_earned_credit = max(cumulative_earned_credits) - head(transfer_earned_credits,1),
-            transfer_earned_credits = mean(transfer_earned_credits, na.rm = T),
-            # target variable
-            enrollment_status = head(enrollment_status, 1)) %>% 
-  ungroup()
-
-# datatable(advising_student_final,)
-```
-
-
-
-
+- 
+- 
+-
