@@ -381,11 +381,18 @@ dat <- dat %>% mutate(name = case_when(
 
 ## c. Feature Selction
 
+0. One Hot encoding
+
+```{r encoding}
+mlr::createDummyFeatures(dat)
+# transform and figure out zero-information, duplicate feature
+```
+
 1. method 1 - Correlation plot
 
 ```{r cor, eval=FALSE, include=TRUE}
 cor <- cor(train %>% select_if(is.numeric))
-corrplot(cor, method = c("number"), type = "upper", tl.col = "black", diag = T)
+corrplot(cor, method = c("number"), type = "upper", tl.col = "black", order = c("hclust"), diag = T, angle = 45)
 ```
 
 2. method 2 - Boruta method
@@ -525,6 +532,7 @@ total_label <- ml_df$survived
 new_tr <- model.matrix(~.+0, data = train %>% select(-target), with = F)
 new_ts <- model.matrix(~.+0, data = test %>% select(-target), with = F)
 new_total <- model.matrix(~.+0, data = ml_df %>% select(-target), with = F)
+# mlr::createDummyFeatures()
 ```
 
 
@@ -566,7 +574,7 @@ params <- list(
   min_child_weight = 1, # the more, preventing overfitting 
   subsample = 1, 
   colsample_bytree = 1,
-  eval_metric = "error", # rmse, rmsle, error, mae, auc
+  eval_metric = "auc", # rmse, rmsle, error, mae, auc
   scale_pos_weight = 549/342 # case 0 number / case 1 number (imblanced)
 )
 
