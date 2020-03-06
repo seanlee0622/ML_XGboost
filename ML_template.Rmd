@@ -124,7 +124,7 @@ code below is needless when
 # Careful to not use as.data.frame()
 ```
 
-```{r missing_table}
+```{r missing_table, eval=FALSE, include=TRUE}
 colSums(is.na(train)) %>% data.frame()
 colSums(is.na(test)) %>% data.frame()
 ```
@@ -162,7 +162,7 @@ grid.arrange(m1, m2, ncol = 1)
 
 - Here is own created missing viz method
 
-```{r missing_viz}
+```{r missing_viz, eval=FALSE, include=TRUE}
 missing_clock_plot <-  function(x){
   colSums(is.na(x)) %>% 
     data.frame() %>% 
@@ -284,14 +284,14 @@ join_data <-
 
 ### 2. add_count (adding variable count to orignal data frame)
 
-```{r add_count}
+```{r add_count, eval=FALSE, include=TRUE}
 dat <- dat %>% add_count(varible, name = "")
 # titanic <- titanic %>% add_count(family, name = "fam_count")
 ```
 
 ### 3. Dimensional Reduction
 
-```{r dr}
+```{r dr, eval=FALSE, include=TRUE}
 # Transform continous data to categorical factor
 dat <- dat %>% mutate(name = variable, cut(breaks = c(), labels = c()))
 # titanic <- titanic %>% mutate(age_group = age %>% cut(breaks = c(0,20,40,60,80), labels = c("minor","young adult","mid-age","aged")))
@@ -344,14 +344,14 @@ dat <- dat %>% mutate(name = case_when(
 
 1. method 1 - Correlation plot
 
-```{r cor}
+```{r cor, eval=FALSE, include=TRUE}
 cor <- cor(train %>% select_if(is.numeric))
 corrplot(cor, method = c("number"), type = "upper", tl.col = "black", diag = T)
 ```
 
 2. method 2 - Boruta method
 
-```{r boruta}
+```{r boruta, eval=FALSE, include=TRUE}
 # Decide if a variable is important or not using Boruta
 boruta_output <- Boruta(survived ~ ., data=na.omit(train), doTrace=2)  # perform Boruta search
 # collect Confirmed and Tentative variables
@@ -363,7 +363,7 @@ plot(boruta_output, cex.axis=.7, las=2, xlab="", main="Variable Importance")  # 
 
 3. method 3 - Recursive Feature Elimination (RFE)
 
-```{r rfe}
+```{r rfe, eval=FALSE, include=TRUE}
 set.seed(1000)
 trainControl <- rfeControl(functions = rfFuncs,
                    method = "repeatedcv",
@@ -386,7 +386,7 @@ Improving data quality
 
 1. Filtering missing value
 
-```{r filtering}
+```{r filtering, eval=FALSE, include=TRUE}
 # Method 1
 dat %>% na.omit() # delete entire missing value regardless of variables
 
@@ -443,7 +443,7 @@ Checking before there is no NA values for each feaure we are going to use
 
 3. NA validation
 
-```{r validation}
+```{r validation, eval=FALSE, include=TRUE}
 colSums(is.na(dat))
 ```
 
@@ -538,7 +538,7 @@ xgb_model2 <- xgb.train(params = params, data= dtrain, nrounds = 500, trControl 
 
 ## f. variable importance
 
-```{r varimp}
+```{r varimp, eval=FALSE, include=TRUE}
 # variable importance
 imp_matrix <- xgb.importance (feature_names = colnames(new_tr),model = xgb_model2)
 xgb.plot.importance(imp_matrix[1:10])
@@ -549,7 +549,7 @@ xgb.plot.tree(model = xgb_model2, trees = 0, show_node_id = TRUE)
 
 ## h. validation of test 
 
-```{r valid_test}
+```{r valid_test, eval=FALSE, include=TRUE}
 test <- test %>% mutate(pred_pct = predict(xgb_model, dtest), pred = ifelse(pred_pct > 0.5, 1, 0))
 test <- test %>% mutate(pred_pct2 = predict(xgb_model2, dtest), pred2 = ifelse(pred_pct2 > 0.5, 1, 0))
 
@@ -559,14 +559,14 @@ confusionMatrix(factor(test$pred2), factor(test$target))
 
 ## i. validation of whole dataset
 
-```{r valid_total}
+```{r valid_total, eval=FALSE, include=TRUE}
 ml_df <- ml_df %>% mutate(pred_pct = predict(xgb_model, dtotal), pred = ifelse(pred_pct > 0.5, 1, 0))
 ml_df <- ml_df %>% mutate(pred_pct2 = predict(xgb_model2, dtotal), pred2 = ifelse(pred_pct2 > 0.5, 1, 0)))
 ```
 
 ## j. confusionmaxtrix
 
-```{r confusion}
+```{r confusion, eval=FALSE, include=TRUE}
 confusionMatrix(factor(ml_df$pred), factor(ml_df$target)) 
 confusionMatrix(factor(ml_df$pred2), factor(ml_df$target))
 ```

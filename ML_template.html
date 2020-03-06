@@ -11,7 +11,6 @@
 
 <meta name="author" content="Korean Data Team" />
 
-<meta name="date" content="2020-03-04" />
 
 <title>ML_template</title>
 
@@ -268,149 +267,351 @@ div.tocify {
 
 <h1 class="title toc-ignore">ML_template</h1>
 <h4 class="author">Korean Data Team</h4>
-<h4 class="date">2020-03-04</h4>
+<h4 class="date">05 3월, 2020</h4>
 
 </div>
 
 
-<!-- 1.Objective -->
-<!-- 2. EDA -->
-<!-- 3. Feature Engineering -->
-<!-- 4.Machine Learning -->
-<!-- 5. Conclusion -->
-<!-- Feature Engineering <- Feature Selection, Imputation, Visualization -->
-<!-- EDA structure, type, missing portion -->
-<!-- Feature Engineering Wranglization -->
-<div id="objective-of-analysis" class="section level1">
-<h1>1. Objective of analysis</h1>
-<div id="a.-use-this-packages." class="section level3">
-<h3>a. Use this packages.</h3>
+<div id="objectives" class="section level1">
+<h1>1. Objectives</h1>
+<ul>
+<li></li>
+<li></li>
+<li></li>
+</ul>
+<div id="a.-load-packages" class="section level2">
+<h2>a. Load Packages</h2>
 <pre class="r"><code># Load the Packages
-library(data.table)
-library(janitor)
+
+# loading package
 library(tidyverse)
+library(data.table)
+
+# clean columns
+library(janitor)
+
+# EDA
 library(DataExplorer)
 library(naniar)
 library(skimr)
+
+# Visualization 
 library(plotly)
 library(corrplot)
 library(DT)
-library(caret)
-library(stringi)
-library(lubridate)
-library(gridExtra)
 library(ggrepel)
-library(caret)
 library(corrplot)
+library(gridExtra)
+
+# Feature Engineering
+library(stringr)
+library(lubridate)
+
+# Feature Selection
+library(Boruta)
+
+
+# Machine Learning
+library(caret)
+library(xgboost)
 library(rattle)
 
 # Instant load the packages
-pacman::p_load(data.table, janitor, tidyverse, DataExplorer, naniar, skimr, plotly, corrplot, DT, caret, stringi, lubridate, gridExtra, ggrepel, caret, corrplot, rattle)</code></pre>
+pacman::p_load(data.table, janitor, tidyverse, DataExplorer, naniar, skimr, plotly, corrplot, DT, gridExtra, ggrepel, stringi, lubridate, caret, xgboost, rattle)</code></pre>
 </div>
-<div id="b.-load-the-data" class="section level3">
-<h3>b. Load the data</h3>
+<div id="b.-load-the-data" class="section level2">
+<h2>b. Load the data</h2>
 <pre class="r"><code># Clean the name of variables (lower.case &amp; '_' connection) by using Janitor package
 
 # Method 1
-data &lt;- fread('url', stringsAsFactors = F) %&gt;% clean_names()
+train &lt;- fread(file = &quot;url&quot;, stringsAsFactors = F, na.strings= c(&quot;NA&quot;,&quot;&quot;)) %&gt;% clean_names()
 
 # Method 2
-data &lt;- read.csv(&quot;url&quot;, header = TRUE) %&gt;% clean_names()</code></pre>
+test &lt;- read_csv(file = &quot;url&quot;, header = TRUE, na = c(&quot;NA&quot;, &quot;&quot;), n_max = Inf, guess_max = min(1000, n_max)) %&gt;% clean_names()
+
+test$target &lt;- NA
+
+dat &lt;- rbind(train, test)</code></pre>
+</div>
+<div id="c.-load-multiple-files-in-one-directory" class="section level2">
+<h2>c. Load Multiple files in one directory</h2>
+<pre class="r"><code>file_list &lt;- sapply(&quot;directory&quot;,function(x){list.files(x,pattern = &quot;csv&quot;)})
+for (i in file_list){
+  assign(str_extract(i, &quot;[a-z|A-Z|_]+(?=\\.)&quot;), fread(i, stringsAsFactors = F, na.strings= c(&quot;NA&quot;,&quot;&quot;)))
+}</code></pre>
 </div>
 </div>
 <div id="eda-expolatory-data-analysis" class="section level1">
 <h1>2. EDA (Expolatory Data Analysis)</h1>
-<div id="a.-scales-of-data---insert-your-data" class="section level3">
-<h3>a. Scales of data - Insert your data</h3>
+<div id="a.-scales-of-data" class="section level2">
+<h2>a. Scales of data</h2>
 <pre class="r"><code># ncol() | nrow()
-cat(&quot;The 'data1' has&quot;, dim(data1)[1], &quot;rows and&quot;, dim(data1)[2], &quot;columns.&quot;
-    &quot;\n The 'data2' has&quot;,dim(data2)[1], &quot;rows and&quot;, dim(data2)[2], &quot;columns.&quot;)</code></pre>
+cat(&quot;Train dataset' has&quot;, dim(train)[1], &quot;rows and&quot;, dim(train)[2], &quot;columns.&quot;
+    &quot;\n Test dataset has&quot;,dim(test)[1], &quot;rows and&quot;, dim(test)[2], &quot;columns.&quot;)</code></pre>
 </div>
-<div id="b.-type-of-variables" class="section level3">
-<h3>b. Type of variables</h3>
-<pre class="r"><code>lapply(c(data1, data2), typeof) %&gt;% data.frame() %&gt;%  t() %&gt;%  as.data.frame() </code></pre>
+<div id="b.-structure-of-data" class="section level2">
+<h2>b. Structure of data</h2>
+<pre class="r"><code>for (i in c(train, test)) {
+  str(i)
+  summary(i)
+  glimpse(i)
+  # skimr package
+  skim(i)
+}</code></pre>
 </div>
-<div id="c.-how-many-missing-values-for-each-dataset" class="section level3">
-<h3>c. How many missing values for each dataset?</h3>
-<pre class="r"><code># missing_transform
-data1 &lt;- sapply(data1, function(x) {ifelse(is.character(x) &amp; nchar(x) == 0, NA, x)}) %&gt;% data.frame(stringsAsFactors = F) # Careful to not use as.data.frame()
-data2 &lt;- sapply(data2, function(x) {ifelse(is.character(x) &amp; nchar(x) == 0, NA, x)}) %&gt;% data.frame(stringsAsFactors = F)</code></pre>
+<div id="c.-type-of-variables" class="section level2">
+<h2>c. Type of variables</h2>
+<pre class="r"><code>lapply(dat, typeof) %&gt;% data.frame() %&gt;%  t() %&gt;%  as.data.frame() </code></pre>
+</div>
+<div id="d.-missing-value" class="section level2">
+<h2>d. missing value</h2>
+<p>code below is needless when</p>
+<ol style="list-style-type: decimal">
+<li>$ na.strings= c(“NA”,“”)) $ is used for <span class="math inline">\(fread\)</span> function and</li>
+<li>$ na = c(“NA”, “”) $ is used for <span class="math inline">\(read\_csv\)</span> function.</li>
+</ol>
+<pre class="r"><code># missing_transform (optional)
+# dat &lt;- sapply(dat, function(x) {ifelse(is.character(x) &amp; nchar(x) == 0, NA, x)}) %&gt;% data.frame(stringsAsFactors = F) 
+# Careful to not use as.data.frame()</code></pre>
+<pre class="r"><code>colSums(is.na(train)) %&gt;% data.frame()
+colSums(is.na(test)) %&gt;% data.frame()</code></pre>
 <pre class="r"><code># Show missing value - visualization
-missing_data1 &lt;- plot_missing(data1, missing_only = T, theme_config = list(legend.position = &quot;right&quot;), ggtheme = theme_light(), title = &quot;data1 missing&quot;) %&gt;% ggplotGrob()
-missing_data2 &lt;- plot_missing(data2, theme_config = list(legend.position = &quot;right&quot;), ggtheme = theme_light(), title = &quot;data2 missing&quot;) %&gt;% ggplotGrob()</code></pre>
+missing_train &lt;- plot_missing(train, missing_only = T, theme_config = list(legend.position = &quot;right&quot;), ggtheme = theme_light(), title = &quot;Train missing&quot;) %&gt;% ggplotGrob()
+missing_test &lt;- plot_missing(test, theme_config = list(legend.position = &quot;right&quot;), ggtheme = theme_light(), title = &quot;Test missing&quot;) %&gt;% ggplotGrob()</code></pre>
 <pre class="r"><code># Show missing result by using grid
-grid.arrange(missing_data1, missing_data2, ncol = 1)</code></pre>
+grid.arrange(missing_train, missing_test, ncol = 1)</code></pre>
 <ul>
 <li><p>The missing plot per variable can be created with <span class="math inline">\(naniar\)</span> Package as well below</p></li>
 <li><p>There is <span class="math inline">\(gg\_miss\_var\)</span> plot which indicates how much proportion of missing values in <span class="math inline">\(nanair\)</span> pacakge below.</p></li>
 </ul>
 <pre class="r"><code># Show missing values by using naniar package
-gmv1 &lt;- naniar::gg_miss_var(data1, show_pct = T)
-gmv2 &lt;- naniar::gg_miss_var(data2, show_pct = T)
+gmv1 &lt;- naniar::gg_miss_var(train, show_pct = T)
+gmv2 &lt;- naniar::gg_miss_var(test, show_pct = T)
 grid.arrange(gmv1, gmv2, nrow = 1)</code></pre>
 <ul>
 <li>Also, it can be visualized with other way shown below. (Not recommended)</li>
 </ul>
 <pre class="r"><code># Show missing values by using naniar package (Not recommended)
-m1 &lt;- naniar::vis_miss(data1, warn_large_data = F) + labs(title = &quot;data1 missing&quot;)
-m2 &lt;- naniar::vis_miss(data2, warn_large_data = F) + labs(title = &quot;data2 missing&quot;)
+m1 &lt;- naniar::vis_miss(train, warn_large_data = F) + labs(title = &quot;train missing&quot;)
+m2 &lt;- naniar::vis_miss(test, warn_large_data = F) + labs(title = &quot;test missing&quot;)
 grid.arrange(m1, m2, ncol = 1)</code></pre>
-</div>
-<div id="d.-switching-original-continous-features-to-any-datatypei.e.numeric-characater-date-value" class="section level3">
-<h3>d. Switching original continous features to any datatype(i.e. numeric, characater, date, …) value</h3>
-<pre class="r"><code># Using mutate_at
-data1 &lt;- data1 %&gt;% mutate_at(colnames(data1) %&gt;% grep(&quot;gpa|act|credits&quot;, ., value =T), as.numeric)
-data2 &lt;- data2 %&gt;% mutate(total_meeting_duration = total_meeting_duration %&gt;% as.numeric())
+<ul>
+<li>Here is own created missing viz method</li>
+</ul>
+<pre class="r"><code>missing_clock_plot &lt;-  function(x){
+  colSums(is.na(x)) %&gt;% 
+    data.frame() %&gt;% 
+    rownames_to_column() %&gt;%
+    mutate(pct = ./nrow(x)) %&gt;% 
+    ggplot(aes(x = rowname, y = .)) +
+    geom_text(aes(label = ifelse(pct == 0, &quot;&quot;, paste(round(pct,2) * 100,&quot;%&quot;)), size = 5), show.legend = F) +
+    geom_bar(stat = &quot;identity&quot;, fill = &quot;red&quot;, alpha = 0.5) +
+    coord_polar(theta = &quot;x&quot;) +
+    labs(x = &quot;Missing number&quot;, y = &quot;Variables&quot;, title = &quot;Missing Value per Variable&quot;) +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank(), axis.text.y = element_blank(), axis.text.x = element_text(size = 10, family = &quot;sans&quot;))
+}
 
-t1 &lt;- data1 %&gt;% select_if(is.numeric) %&gt;% colnames() %&gt;% data.frame() 
-t2 &lt;- data2 %&gt;% select_if(is.numeric) %&gt;% colnames() %&gt;% data.frame()
+missing_clock_plot(train)
+missing_clock_plot(test)</code></pre>
+</div>
+<div id="d.-switching-original-features-to-any-datatypei.e.numeric-characater-date-value-with-condition-mutate_at" class="section level2">
+<h2>d. Switching original features to any datatype(i.e. numeric, characater, date, …) value with condition (mutate_at)</h2>
+<pre class="r"><code># Using mutate_at
+# train &lt;- train %&gt;% mutate_at(colnames(data1) %&gt;% grep(&quot;gpa|act|credits&quot;, ., value =T), as.numeric)
+# test &lt;- test %&gt;% mutate(total_meeting_duration = total_meeting_duration %&gt;% as.numeric())
+
+t1 &lt;- train %&gt;% select_if(is.numeric) %&gt;% colnames() %&gt;% data.frame() 
+t2 &lt;- test %&gt;% select_if(is.numeric) %&gt;% colnames() %&gt;% data.frame()
 rbind(t1, t2) %&gt;% mutate(type = &quot;Numeric&quot;) # Create 'type' column</code></pre>
 </div>
-<div id="e.-dataexplorer-package" class="section level3">
-<h3>e. DataExplorer Package</h3>
+<div id="e.-dataexplorer-package" class="section level2">
+<h2>e. DataExplorer Package</h2>
 <pre class="r"><code># DataExplor package - numeric variable &amp; categorical variable &amp; row &amp; column
 t1 &lt;- DataExplorer::introduce(data1) %&gt;% t() %&gt;% as.data.frame() %&gt;% rownames_to_column(&quot;attribute&quot;)
 t2 &lt;- DataExplorer::introduce(data2) %&gt;% t() %&gt;% as.data.frame() %&gt;% rownames_to_column(&quot;attribute&quot;)
 
 # DataExplor package - Visualization
-p1 &lt;- DataExplorer::plot_intro(data1, title = &quot;data1&quot;, ggtheme = theme_bw())
-p2 &lt;- DataExplorer::plot_intro(data2, title = &quot;data2&quot;, ggtheme = theme_bw())</code></pre>
+p1 &lt;- DataExplorer::plot_intro(data1, title = &quot;train&quot;, ggtheme = theme_bw())
+p2 &lt;- DataExplorer::plot_intro(data2, title = &quot;test&quot;, ggtheme = theme_bw())</code></pre>
 <pre class="r"><code># Combine tables and plots in a row.
 grid.arrange(p1, tableGrob(t1, rows=NULL), tableGrob(t2, rows=NULL), p2,  ncol = 2, top = &quot;Attributes of datasets&quot;)</code></pre>
 </div>
 </div>
-<div id="feature-engineering-feature-selection-imputation-visualization" class="section level1">
-<h1>3. Feature Engineering (Feature selection, Imputation, Visualization)</h1>
-<div id="a.-data1-data2-joining-key" class="section level3">
-<h3>a. data1 &amp; data2 Joining key</h3>
-<pre class="r"><code>joining_key &lt;- data1[,which(colnames(data1) %in% colnames(data2))] %&gt;% colnames()
+<div id="feature-engineering" class="section level1">
+<h1>3. Feature Engineering</h1>
+<p>Sequences</p>
+<ol style="list-style-type: decimal">
+<li>Feature Exploation (Data Visulaization)</li>
+<li>Wraglization</li>
+<li>Feature selection</li>
+<li>Imputation</li>
+</ol>
+<div id="a.-feature-exploration" class="section level2">
+<h2>a. Feature Exploration</h2>
+<ol style="list-style-type: decimal">
+<li>ggplot containing table</li>
+</ol>
+<pre class="r"><code># t1 &lt;- advising_student_fs %&gt;% 
+#   group_by(enrollment_status) %&gt;% 
+#   summarise(mean = mean(sum_of_cumulative_missing_credit, na.rm = T)) 
+# 
+# advising_student_fs %&gt;% 
+#   ggplot(aes(x = enrollment_status, y = sum_of_cumulative_missing_credit)) +
+#   geom_jitter(alpha = 0.3, color = &quot;gray&quot;) +
+#   geom_violin(aes(fill = enrollment_status)) +
+#   theme_minimal() +
+#   theme(legend.position = &quot;none&quot;) +
+#   coord_flip() +
+#   annotation_custom(tableGrob(t1, rows = NULL), xmin= 0.5, xmax=  1 , ymin= 50 , ymax= 60)</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>alluvium plot</li>
+</ol>
+<pre class="r"><code># titanic %&gt;% group_by(sex, age_group, survived) %&gt;% tally() %&gt;% 
+#   ggplot(data= . , aes(axis1 = sex, axis2 = age_group, axis3 = survived, y = n)) +
+#   geom_alluvium(aes(fill = survived), width = 0, knot.pos = 0) +
+#   guides(fill = F) +
+#   geom_stratum(width = 0.1, infer.label = T) +
+#   geom_label(stat = &quot;stratum&quot;, infer.label = T) +
+#   scale_x_continuous(breaks = c(1,2,3) , labels = c(&quot;sex&quot;, &quot;age group&quot;, &quot;survived&quot;)) +
+#   theme_minimal()</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>proportion table</li>
+</ol>
+<pre class="r"><code># prop.table(table(train$survived)) %&gt;% data.frame()
+# table(advising_student_fs$enrollment_status) %&gt;% data.frame() %&gt;% mutate(Pct = round(Freq / sum(Freq) * 100, 2))</code></pre>
+</div>
+<div id="b.-data-wraglization" class="section level2">
+<h2>b. Data Wraglization</h2>
+<div id="data1-data2-joining-key" class="section level3">
+<h3>1. data1 &amp; data2 Joining key</h3>
+<pre class="r"><code># without function
+joining_key &lt;- data1[,which(colnames(data1) %in% colnames(data2))] %&gt;% colnames()
 
 join_data &lt;- 
-  left_join(data2, data1, by = joining_key)
+  left_join(data1, data2, by = joining_key)
+
+# with function (natural join)
+natural_join &lt;- function(x,y){
+  x %&gt;% left_join(y, by = x[,which(colnames(x) %in% colnames(y))] %&gt;% colnames())
+}
+
+join_data &lt;-
+  data1 %&gt;% natural_join(data2)
+
 
 # datatable(join_data %&gt;% head(100), options = list(scrollX = T))</code></pre>
 </div>
-<div id="b.-target-column-target" class="section level3">
-<h3>b. ‘target column’ (Target)</h3>
-<p><strong>Before</strong></p>
-<pre class="r"><code>join_data %&gt;% group_by('target column') %&gt;% tally() </code></pre>
-<p><strong>After</strong></p>
-<pre class="r"><code>join_data &lt;- join_data %&gt;% mutate('target column' = ifelse(str_detect('target column',&quot;Graduated&quot;), &quot;Graduated&quot;, &quot;Not Graduated&quot;))
+<div id="add_count-adding-variable-count-to-orignal-data-frame" class="section level3">
+<h3>2. add_count (adding variable count to orignal data frame)</h3>
+<pre class="r"><code>dat &lt;- dat %&gt;% add_count(varible, name = &quot;&quot;)
+# titanic &lt;- titanic %&gt;% add_count(family, name = &quot;fam_count&quot;)</code></pre>
+</div>
+<div id="dimensional-reduction" class="section level3">
+<h3>3. Dimensional Reduction</h3>
+<pre class="r"><code># Transform continous data to categorical factor
+dat &lt;- dat %&gt;% mutate(name = variable, cut(breaks = c(), labels = c()))
+# titanic &lt;- titanic %&gt;% mutate(age_group = age %&gt;% cut(breaks = c(0,20,40,60,80), labels = c(&quot;minor&quot;,&quot;young adult&quot;,&quot;mid-age&quot;,&quot;aged&quot;)))
 
-join_data$'target column' %&gt;% unique()</code></pre>
+# ifelse
+dat &lt;- dat %&gt;% mutate(name = ifelse(condition, true_value, false_value))
+# titanic &lt;- titanic %&gt;% 
+#   mutate(fa = ifelse(fa == &quot;alone&quot;, &quot;alone&quot;, &quot;family&quot;))
+
+# case_when
+dat &lt;- dat %&gt;% mutate(name = case_when(
+                      condition1 ~ &quot;level1&quot;,
+                      condition2 ~ &quot;level2&quot;,
+                      condition3 ~ &quot;level3&quot;,
+                      TRUE ~ &quot;level4&quot;
+                      ))
+# titanic &lt;-
+#   titanic %&gt;% 
+#   mutate(fa = case_when(
+#     sib_sp + parch == 0 ~  &quot;alone&quot;,
+#     fam_count == sib_sp + parch + 1 ~ family,
+#     related_number == sib_sp + parch + 1 ~ family,
+#     TRUE ~ &quot;Unknown&quot;
+#   ))</code></pre>
+</div>
+<div id="text-mining" class="section level3">
+<h3>4. text mining</h3>
+<pre class="r"><code># str_detect (return TRUE, FALSE)
+# str_extract | str_extract_all
+# str_replace | str_replace_all
+# str_split
+# grep | gsub</code></pre>
+</div>
+<div id="tidyverse" class="section level3">
+<h3>5. tidyverse</h3>
+<pre class="r"><code># gather, spread
+# separate, unite
+# arrange
+# distinct
+# top_n
+# rank</code></pre>
 </div>
 </div>
-<div id="machine-learning" class="section level1">
-<h1>4. Machine Learning</h1>
-<div id="target-distribution" class="section level2">
-<h2>1. Target Distribution</h2>
-<pre class="r"><code>proportion &lt;- advising_student_final %&gt;% group_by(enrollment_status) %&gt;% count() %&gt;% ungroup() %&gt;%  mutate(pct = round(n/sum(n),2))
-proportion</code></pre>
+<div id="c.-feature-selction" class="section level2">
+<h2>c. Feature Selction</h2>
+<ol style="list-style-type: decimal">
+<li>method 1 - Correlation plot</li>
+</ol>
+<pre class="r"><code>cor &lt;- cor(train %&gt;% select_if(is.numeric))
+corrplot(cor, method = c(&quot;number&quot;), type = &quot;upper&quot;, tl.col = &quot;black&quot;, diag = T)</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>method 2 - Boruta method</li>
+</ol>
+<pre class="r"><code># Decide if a variable is important or not using Boruta
+boruta_output &lt;- Boruta(survived ~ ., data=na.omit(train), doTrace=2)  # perform Boruta search
+# collect Confirmed and Tentative variables
+boruta_signif &lt;- names(boruta_output$finalDecision[boruta_output$finalDecision %in% c(&quot;Confirmed&quot;, &quot;Tentative&quot;)])  
+boruta_signif &lt;- getSelectedAttributes(boruta_output, withTentative = T)
+print(boruta_signif)
+plot(boruta_output, cex.axis=.7, las=2, xlab=&quot;&quot;, main=&quot;Variable Importance&quot;)  # plot variable importance</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>method 3 - Recursive Feature Elimination (RFE)</li>
+</ol>
+<pre class="r"><code>set.seed(1000)
+trainControl &lt;- rfeControl(functions = rfFuncs,
+                   method = &quot;repeatedcv&quot;,
+                   repeats = 5,
+                   verbose = FALSE,
+                   allowParallel = TRUE)
+
+train_model &lt;- train %&gt;% na.omit()
+
+lmProfile &lt;- rfe(x= train_model, y= train_model$target,
+                 sizes = c(1,5,10,15,20),
+                 rfeControl = trainControl)
+
+lmProfile</code></pre>
 </div>
-<div id="identify-the-missing-variables-and-impute-the-part-median" class="section level2">
-<h2>2. Identify the missing variables and impute the part (median)</h2>
-<pre class="r"><code>naniar::gg_miss_var(advising_student_final, show_pct = T)
-# naniar::gg_miss_fct(advising_student_final, enrollment_status)
+<div id="d.-imputation" class="section level2">
+<h2>d. Imputation</h2>
+<p>Improving data quality</p>
+<ol style="list-style-type: decimal">
+<li>Filtering missing value</li>
+</ol>
+<pre class="r"><code># Method 1
+dat %&gt;% na.omit() # delete entire missing value regardless of variables
+
+# Method 2
+missing_variables &lt;- c() # Put selected variables for ML
+dat %&gt;% drop_na(mssing_variables)</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Impute missing value</li>
+</ol>
+<p>Median is the most frequent way to impute the missing data</p>
+<ul>
+<li><ol style="list-style-type: lower-alpha">
+<li>Identification of data</li>
+</ol></li>
+</ul>
+<pre class="r"><code># Visualize missing portion of each variables
+naniar::gg_miss_var(dat, show_pct = T)
+
+# Example
 
 # advising_student_final %&gt;% ggplot() +
 #   geom_histogram(aes(x = act_composite, fill = enrollment_status)) +
@@ -422,166 +623,139 @@ proportion</code></pre>
 #   facet_wrap(~ enrollment_status) +
 #   theme_minimal()
 
-advising_student_final %&gt;% group_by(enrollment_status) %&gt;% summarise(act_median = median(act_composite, na.rm = T), hs_gpa_median = median(high_school_gpa, na.rm = T))
+# advising_student_final %&gt;% group_by(enrollment_status) %&gt;% summarise(act_median = median(act_composite, na.rm = T), hs_gpa_median = median(high_school_gpa, na.rm = T))
+# 
+# advising_student_final[advising_student_final$enrollment_status == &quot;Graduated&quot; &amp; is.na(advising_student_final$act_composite),&quot;act_composite&quot;] &lt;- 22
+# advising_student_final[advising_student_final$enrollment_status == &quot;Not Graduated&quot; &amp; is.na(advising_student_final$act_composite),&quot;act_composite&quot;] &lt;- 22
+# advising_student_final[advising_student_final$enrollment_status == &quot;Graduated&quot; &amp; is.na(advising_student_final$high_school_gpa),&quot;high_school_gpa&quot;] &lt;- 3.46
+# advising_student_final[advising_student_final$enrollment_status == &quot;Not Graduated&quot; &amp; is.na(advising_student_final$high_school_gpa),&quot;high_school_gpa&quot;] &lt;- 3.24
 
-advising_student_final[advising_student_final$enrollment_status == &quot;Graduated&quot; &amp; is.na(advising_student_final$act_composite),&quot;act_composite&quot;] &lt;- 22
-advising_student_final[advising_student_final$enrollment_status == &quot;Not Graduated&quot; &amp; is.na(advising_student_final$act_composite),&quot;act_composite&quot;] &lt;- 22
-advising_student_final[advising_student_final$enrollment_status == &quot;Graduated&quot; &amp; is.na(advising_student_final$high_school_gpa),&quot;high_school_gpa&quot;] &lt;- 3.46
-advising_student_final[advising_student_final$enrollment_status == &quot;Not Graduated&quot; &amp; is.na(advising_student_final$high_school_gpa),&quot;high_school_gpa&quot;] &lt;- 3.24
-
-
-advising_student_final &lt;- advising_student_final %&gt;% mutate_if(is.character, as.factor) %&gt;% mutate_if(is.logical, as.factor) %&gt;% select(-c(identifier))
-
-sapply(advising_student_final, class)
+# advising_student_final &lt;- advising_student_final %&gt;% mutate_if(is.character, as.factor) %&gt;% mutate_if(is.logical, as.factor) %&gt;% select(-c(identifier))
+ 
+# sapply(advising_student_final, class)
 
 naniar::gg_miss_var(advising_student_final, show_pct = T)</code></pre>
-<pre class="r"><code>set.seed(1000)
-InTraining &lt;- caret::createDataPartition(advising_student_final$enrollment_status, p = .7, list = F)
-Train &lt;- advising_student_final %&gt;% slice(InTraining)
-Test &lt;- advising_student_final %&gt;% slice(-InTraining)
-
-ModelFit_1 &lt;- train(enrollment_status ~ ., data = Train, method = &quot;rf&quot;, importance = T)
-ModelFit_2 &lt;- train(enrollment_status ~ ., data = Train, method = &quot;rpart&quot;)</code></pre>
-<pre class="r"><code>varimp1 &lt;- ggplot(varImp(ModelFit_1)) + geom_label(aes(label = paste0(round(Importance),&quot;%&quot;))) + theme_bw() + labs(title = &quot;Random Forest&quot;) + theme(plot.title = element_text(hjust = 0.5))
-varimp2 &lt;- ggplot(varImp(ModelFit_1)) + geom_label(aes(label = paste0(round(Importance),&quot;%&quot;))) + theme_bw() + labs(title = &quot;RPart&quot;) + theme(plot.title = element_text(hjust = 0.5))
-grid.arrange(varimp1, varimp2, ncol = 1)</code></pre>
-<pre class="r"><code>caret::confusionMatrix(Test$enrollment_status ,predict(ModelFit_1, Test))
-caret::confusionMatrix(Test$enrollment_status ,predict(ModelFit_2, Test))</code></pre>
-<pre class="r"><code>fancyRpartPlot(ModelFit_2$finalModel)</code></pre>
-<pre class="r"><code>colSums(is.na(advising_student_final))
-
-advising_student_final &lt;- advising_student_final %&gt;% mutate(pred = predict(ModelFit_1, advising_student_final))
-
-confusionMatrix(advising_student_final$enrollment_status, advising_student_final$pred)</code></pre>
-</div>
-</div>
-<div id="useful-code" class="section level1">
-<h1>* Useful Code *</h1>
-<div id="round-percentage" class="section level3">
-<h3>round(), percentage</h3>
-<pre class="r"><code>table(advising_student_fs$enrollment_status) %&gt;% data.frame() %&gt;% mutate(Pct = round(Freq / sum(Freq) * 100, 2))</code></pre>
-</div>
-<div id="ggplot-help" class="section level3">
-<h3>ggplot help</h3>
-<pre class="r"><code>t1 &lt;- advising_student_fs %&gt;% 
-  group_by(enrollment_status) %&gt;% 
-  summarise(mean = mean(sum_of_cumulative_missing_credit, na.rm = T)) 
-
-advising_student_fs %&gt;% 
-  ggplot(aes(x = enrollment_status, y = sum_of_cumulative_missing_credit)) +
-  geom_jitter(alpha = 0.3, color = &quot;gray&quot;) +
-  geom_violin(aes(fill = enrollment_status)) +
-  theme_minimal() +
-  theme(legend.position = &quot;none&quot;) +
-  coord_flip() +
-  annotation_custom(tableGrob(t1, rows = NULL), xmin= 0.5, xmax=  1 , ymin= 50 , ymax= 60)</code></pre>
-</div>
-<div id="lubridate-as.interval" class="section level3">
-<h3>Lubridate::%–% = as.interval()</h3>
-<div id="ex1" class="section level5">
-<h5>Ex1</h5>
-<pre class="r"><code>fix_year &lt;- function(x, year=1919){ #since this year is 2019, if year digits are over 19, it is regared as 1900 century.
-  m &lt;- year(x) %% 100
-  year(x) &lt;- ifelse(m &gt; year %% 100, 1900+m, 2000+m)
-  x
-}
-
-advising_student_fs &lt;-
-advising_student_fs %&gt;% 
-  mutate(mission_enter_date = mdy(mission_enter_date) %&gt;% fix_year(), mission_release_date = mdy(mission_release_date) %&gt;% fix_year()) %&gt;% 
-  mutate(served_mission = mission_enter_date %--% mission_release_date %&gt;% as.duration()/ ddays(1)) %&gt;% 
-  mutate(served_mission = case_when(
-    is.na(served_mission) ~ &quot;N&quot;,
-    served_mission &lt; 100 ~ &quot;H&quot;,
-    TRUE ~ &quot;F&quot;
-  ))</code></pre>
-</div>
-<div id="ex2" class="section level5">
-<h5>Ex2</h5>
-<pre class="r"><code>advising_student_fs &lt;- 
-advising_student_fs %&gt;% 
-  mutate(age = round(mdy(birth_date) %&gt;% fix_year() %--% ymd(paste0(20,parse_number(term_code)), truncated = 2L) %&gt;% as.duration() / dyears(1)))</code></pre>
-<div id="section" class="section level48">
-<p></p>
-</div>
-</div>
-</div>
-<div id="subprogram-dayschool-vs-online" class="section level2">
-<h2>- Subprogram (Dayschool VS Online)</h2>
-<pre class="r"><code>advising_student_fs &lt;-
-advising_student_fs %&gt;% 
-  mutate(subprogram = substring(subprogram,1,1))</code></pre>
 <ul>
-<li>Students can be classified into in-school student (D) or online student. (O)</li>
+<li><ol start="2" style="list-style-type: lower-alpha">
+<li>Imputation median per group</li>
+</ol></li>
 </ul>
+<pre class="r"><code># for (i in unique(titanic$title)){
+#   titanic$age[titanic$title == i &amp; is.na(titanic$age)] &lt;- median(titanic$age[titanic$title == i ], na.rm = T)
+# }</code></pre>
+<p>Checking before there is no NA values for each feaure we are going to use</p>
+<ol start="3" style="list-style-type: decimal">
+<li>NA validation</li>
+</ol>
+<pre class="r"><code>colSums(is.na(dat))</code></pre>
 </div>
-<div id="check-if-student-transferred-from-other-institution" class="section level2">
-<h2>- Check if student transferred from other institution</h2>
-<pre class="r"><code>advising_student_fs &lt;-
-advising_student_fs %&gt;% 
-  mutate(transfer = ifelse(transfer_earned_credits &gt; 0, 1, 0) %&gt;% as.factor())
+</div>
+<div id="machine-learning" class="section level1">
+<h1>4. Machine Learning</h1>
+<div id="a.-check-target-distribution" class="section level2">
+<h2>a. Check Target Distribution</h2>
+<p>check if target variable is balanced or not</p>
+<pre class="r"><code>proportion &lt;- dat %&gt;% group_by(target) %&gt;% tally() %&gt;%  mutate(pct = round(n/sum(n),2))
+proportion</code></pre>
+</div>
+<div id="b.-split-between-train-vs-test" class="section level2">
+<h2>b. Split between train vs test</h2>
+<pre class="r"><code># Modeling
+features &lt;- c()
+ml_df &lt;- dat %&gt;% filter(!is.na(target)) %&gt;% select(features) 
 
-advising_student_fs %&gt;% group_by(transfer) %&gt;% count()</code></pre>
+set.seed(1000)
+InTraining &lt;- caret::createDataPartition(data$target, p = .7, list = F)
+# createFolds(train$survived, 10, list = F)
+train &lt;- dat %&gt;% dplyr::slice(InTraining)
+test &lt;- dat %&gt;% dplyr::slice(-InTraining)</code></pre>
 </div>
-<div id="top-5-major-by-leveldegree" class="section level2">
-<h2>- Top 5 Major by level(degree)</h2>
-<pre class="r"><code>major_fs &lt;- advising_student_fs %&gt;% group_by(level, major) %&gt;% tally(sort = T)
+<div id="c.-xgboost-setting" class="section level2">
+<h2>c. xgboost setting</h2>
+<pre class="r"><code># taget setting
+tr_label &lt;- train$survived 
+ts_label &lt;- test$survived 
+total_label &lt;- ml_df$survived
 
-major_fs %&gt;% group_by(level) %&gt;% top_n(5) %&gt;% ungroup() %&gt;% 
-  ggplot(aes(x = parse_number(major) %&gt;% as.factor() %&gt;% reorder(n), y = n)) +
-  geom_col(aes(fill = level)) +
-  geom_label(aes(label = str_extract(major, &quot;[:alpha:]+&quot;))) +
-  facet_wrap(level ~., scales = &quot;free&quot;, ncol = 1) +
-  coord_flip() +
-  theme_bw() +
-  labs(x = &quot;Major&quot;, y = &quot;Count&quot;, title = &quot;Top 5 Major by degree&quot;) +
-  scale_fill_discrete(label = c(&quot;Assocaite&quot;, &quot;Bachelor&quot;))</code></pre>
+# model.matrix
+new_tr &lt;- model.matrix(~.+0, data = train %&gt;% select(-target), with = F)
+new_ts &lt;- model.matrix(~.+0, data = test %&gt;% select(-target), with = F)
+new_total &lt;- model.matrix(~.+0, data = ml_df %&gt;% select(-target), with = F)</code></pre>
+<pre class="r"><code>#xgb.DMatrix
+dtrain &lt;- xgb.DMatrix(new_tr, label = tr_label)
+dtest &lt;- xgb.DMatrix(new_ts, label = ts_label)
+dtotal &lt;- xgb.DMatrix(new_total, label = total_label)</code></pre>
 </div>
-<div id="top-5-advising-reason-by-leveldegree" class="section level2">
-<h2>- Top 5 Advising Reason by level(degree)</h2>
-<pre class="r"><code>advising_reason_fs &lt;-
-  advising_student_fs %&gt;% group_by(level, advising_reason, enrollment_status) %&gt;% count() %&gt;% ungroup() %&gt;% group_by(level, enrollment_status) %&gt;% top_n(5, n)
+<div id="d.-default-modeling" class="section level2">
+<h2>d. default modeling</h2>
+<pre class="r"><code># traincontrol : cross-validation (5 folds)
+xgb_trcontrol &lt;- trainControl(method = &quot;cv&quot;, number = 5, allowParallel = TRUE)
 
-advising_reason_fs %&gt;% ggplot(aes(x = reorder(advising_reason, -n), y = n)) +
-  geom_col(aes(fill = level), position = &quot;dodge&quot;) +
-  facet_wrap( level ~ enrollment_status, scales = &quot;free&quot;) +
-  theme_light() +
-  coord_flip() +
-  theme(legend.position = &quot;top&quot;) +
-  labs(x = &quot;&quot;, y = &quot;&quot;) +
-  scale_fill_discrete(labels = c(&quot;Associate&quot;,&quot;Bachelor&quot;)) +
-  labs(caption = &quot;We can see that Graduated Students are more likely to visit advising center with the reason of Glad Planner &amp; Class Planning compared to others&quot;)</code></pre>
+# model without params
+xgb_model&lt;- xgboost::xgboost(data = new_tr, 
+                    label = tr_label,
+                    verbosity = 2, 
+                    objective = &quot;binary:logistic&quot;, 
+                    nrounds = 500, 
+                    early_stopping_rounds = 100, 
+                    trControl = xgb_trcontrol)</code></pre>
 </div>
-<div id="aggregate-the-data-group-by-student-id-identifier" class="section level2">
-<h2>- Aggregate the data group by student id (Identifier)</h2>
-<p>After feature engineering, I aggregated the data by distinct Identifier to manage the individual data of each student.</p>
-<pre class="r"><code>advising_student_final &lt;- 
-advising_student_fs %&gt;% 
-  group_by(identifier) %&gt;% 
-  arrange(cumulative_earned_credits) %&gt;% 
-  summarise(total_meeting_duration = sum(total_meeting_duration),
-            number_of_semester = length(enrolled_current_semester[unique(term_code)] %&gt;% str_detect(&quot;T&quot;)) ,
-            classification_begin = head(classification_begin,1),
-            served_mission = head(served_mission,1),
-            subprogram = head(subprogram,1),
-            gender = head(gender, 1),
-            act_composite = mean(act_composite),
-            high_school_gpa = mean(high_school_gpa),
-            level = head(level, 1),
-            cumulative_gpa = tail(cumulative_gpa, 1),
-            transfer = head(transfer, 1),
-            age = round(mean(age)),
-            cumulative_earned_credits = head(cumulative_earned_credits, 1),
-            cumulative_attempted_credits = head(cumulative_attempted_credits, 1),
-            cumulative_missing_credit = round(max(cumulative_attempted_credits) - (max(cumulative_earned_credits) - head(transfer_earned_credits,1)),2),
-            cumulative_campus_earned_credit = max(cumulative_earned_credits) - head(transfer_earned_credits,1),
-            transfer_earned_credits = mean(transfer_earned_credits, na.rm = T),
-            # target variable
-            enrollment_status = head(enrollment_status, 1)) %&gt;% 
-  ungroup()
+<div id="e.-params-modeling" class="section level2">
+<h2>e. params modeling</h2>
+<pre class="r"><code>?xgb.train
 
-# datatable(advising_student_final,)</code></pre>
+params &lt;- list(
+  booster = &quot;gbtree&quot;,
+  objective = &quot;binary:logistic&quot;,
+  eta = 0.2,
+  gamma = 0.1,
+  max_depth = 6,
+  min_child_weight = 1,
+  subsample = 1,
+  colsample_bytree = 1,
+  eval_metric = &quot;mae&quot;, # rmse, rmsle, error, mae, auc
+  scale_pos_weight = 549/342
+)
+
+watchlist &lt;- list(train = dtrain, eval = dtest)
+
+xgb_model2 &lt;- xgb.train(params = params, data= dtrain, nrounds = 500, trControl = xgb_trcontrol, watchlist = watchlist, early_stopping_rounds = 100)</code></pre>
 </div>
+<div id="f.-variable-importance" class="section level2">
+<h2>f. variable importance</h2>
+<pre class="r"><code># variable importance
+imp_matrix &lt;- xgb.importance (feature_names = colnames(new_tr),model = xgb_model2)
+xgb.plot.importance(imp_matrix[1:10])
+
+# xgboost tree viz
+xgb.plot.tree(model = xgb_model2, trees = 0, show_node_id = TRUE)</code></pre>
+</div>
+<div id="h.-validation-of-test" class="section level2">
+<h2>h. validation of test</h2>
+<pre class="r"><code>test &lt;- test %&gt;% mutate(pred_pct = predict(xgb_model, dtest), pred = ifelse(pred_pct &gt; 0.5, 1, 0))
+test &lt;- test %&gt;% mutate(pred_pct2 = predict(xgb_model2, dtest), pred2 = ifelse(pred_pct2 &gt; 0.5, 1, 0))
+
+confusionMatrix(factor(test$pred), factor(test$target))
+confusionMatrix(factor(test$pred2), factor(test$target))</code></pre>
+</div>
+<div id="i.-validation-of-whole-dataset" class="section level2">
+<h2>i. validation of whole dataset</h2>
+<pre class="r"><code>ml_df &lt;- ml_df %&gt;% mutate(pred_pct = predict(xgb_model, dtotal), pred = ifelse(pred_pct &gt; 0.5, 1, 0))
+ml_df &lt;- ml_df %&gt;% mutate(pred_pct2 = predict(xgb_model2, dtotal), pred2 = ifelse(pred_pct2 &gt; 0.5, 1, 0)))</code></pre>
+</div>
+<div id="j.-confusionmaxtrix" class="section level2">
+<h2>j. confusionmaxtrix</h2>
+<pre class="r"><code>confusionMatrix(factor(ml_df$pred), factor(ml_df$target)) 
+confusionMatrix(factor(ml_df$pred2), factor(ml_df$target))</code></pre>
+</div>
+</div>
+<div id="conclusion" class="section level1">
+<h1>5. conclusion</h1>
+<ul>
+<li></li>
+<li></li>
+<li></li>
+</ul>
 </div>
 
 
