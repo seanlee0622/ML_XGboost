@@ -12,9 +12,21 @@ output:
     code_folding: hide
 ---
 
+# 예상
+
+1. 데이터베이스에 뽑아올 가능성이 높다 <- Join 을 잘 써야한다.
+2. 바이너리 문제가 나올 가능성이 높다 (A VS B)
+3. 텍스트마이닝을 할 가능성이 높다. 
+4. 금융정보에 대한 지식이 필요할 가능성이 높다 (feature selection)
+
+5. Outlier Detection (KNN = K-NEIGHTBORHOOD-NEAREST)
+
 # 1. Objectives
 
-* 
+* Predict customer behaviors
+(name, address, income, credit score, phone number, job, purchase item, lease term, lease amount, interest rate, number of late payments, account_id
+given name, family name, birth data (age), gender, bank, demographic info, review(sentiment)) 
+
 * 
 *
 
@@ -64,10 +76,10 @@ pacman::p_load(data.table, janitor, tidyverse, DataExplorer, naniar, skimr, plot
 # Clean the name of variables (lower.case & '_' connection) by using Janitor package
 
 # Method 1
-train <- fread(file = "url", stringsAsFactors = F, na.strings= c("NA","")) %>% clean_names()
+train <- fread(file = "url", stringsAsFactors = F, na.strings= c("NA","","NULL")) %>% clean_names()
 
 # Method 2
-test <- read_csv(file = "url", header = TRUE, na = c("NA", ""), n_max = Inf, guess_max = min(1000, n_max)) %>% clean_names()
+test <- read_csv(file = "url", header = TRUE, na = c("NA", "","NULL"), n_max = Inf, guess_max = min(1000, n_max)) %>% clean_names()
 
 test$target <- NA
 
@@ -78,7 +90,7 @@ dat <- rbind(train, test)
 ```{r load_multi, eval=FALSE, include= TRUE}
 file_list <- sapply("directory",function(x){list.files(x,pattern = "csv")})
 for (i in file_list){
-  assign(str_extract(i, "[a-z|A-Z|_]+(?=\\.)"), fread(i, stringsAsFactors = F, na.strings= c("NA","")))
+  assign(str_extract(i, "[a-z|A-Z|_|0-9]+(?=\\.)"), fread(i, stringsAsFactors = F, na.strings= c("NA","","NULL")))
 }
 ```
 
@@ -222,6 +234,9 @@ Sequences
 
 ## a. Feature Exploration
 
+- ggplot 
+- highcharter
+
 1. ggplot containing table
 
 ```{r plot_table_inside, eval=FALSE, include=TRUE}
@@ -322,11 +337,13 @@ dat <- dat %>% mutate(name = case_when(
 ### 4. text mining
 
 ```{r text_mining}
+# description, review, sentiment, address(city, zipcode)
 # str_detect (return TRUE, FALSE)
 # str_extract | str_extract_all
 # str_replace | str_replace_all
 # str_split
 # grep | gsub
+# regular expression
 ```
 
 ### 5. tidyverse
@@ -373,7 +390,7 @@ trainControl <- rfeControl(functions = rfFuncs,
 
 train_model <- train %>% na.omit()
 
-lmProfile <- rfe(x= train_model, y= train_model$target,
+lmProfile <- rfe(x= train_model, y= train_model$survived,
                  sizes = c(1,5,10,15,20),
                  rfeControl = trainControl)
 
@@ -521,33 +538,23 @@ xgb_model<- xgboost::xgboost(data = new_tr,
 params <- list(
   booster = "gbtree",
   objective = "binary:logistic",
-  eta = 0.2,
+  eta = 0.2, # the less, preventing overfitting
   gamma = 0.1,
-  max_depth = 6,
-  min_child_weight = 1,
-  subsample = 1,
+  max_depth = 6, # the less, prevent overfitiing
+  min_child_weight = 1, # the more, preventing overfitting 
+  subsample = 1, 
   colsample_bytree = 1,
-  eval_metric = "mae", # rmse, rmsle, error, mae, auc
-  scale_pos_weight = 549/342
+  eval_metric = "error", # rmse, rmsle, error, mae, auc
+  scale_pos_weight = 549/342 # case 0 number / case 1 number (imblanced)
 )
 
-watchlist <- list(train = dtrain, eval = dtest)
+watchlist <- list(train = dtrain, test = dtest, total = dtotal)
 
 xgb_model2 <- xgb.train(params = params, data= dtrain, nrounds = 500, trControl = xgb_trcontrol, watchlist = watchlist, early_stopping_rounds = 100)
 ```
 
-## f. variable importance
 
-```{r varimp, eval=FALSE, include=TRUE}
-# variable importance
-imp_matrix <- xgb.importance (feature_names = colnames(new_tr),model = xgb_model2)
-xgb.plot.importance(imp_matrix[1:10])
-
-# xgboost tree viz
-xgb.plot.tree(model = xgb_model2, trees = 0, show_node_id = TRUE)
-```
-
-## h. validation of test 
+## f. validation of test 
 
 ```{r valid_test, eval=FALSE, include=TRUE}
 test <- test %>% mutate(pred_pct = predict(xgb_model, dtest), pred = ifelse(pred_pct > 0.5, 1, 0))
@@ -557,14 +564,14 @@ confusionMatrix(factor(test$pred), factor(test$target))
 confusionMatrix(factor(test$pred2), factor(test$target))
 ```
 
-## i. validation of whole dataset
+## g. validation of whole dataset
 
 ```{r valid_total, eval=FALSE, include=TRUE}
 ml_df <- ml_df %>% mutate(pred_pct = predict(xgb_model, dtotal), pred = ifelse(pred_pct > 0.5, 1, 0))
 ml_df <- ml_df %>% mutate(pred_pct2 = predict(xgb_model2, dtotal), pred2 = ifelse(pred_pct2 > 0.5, 1, 0)))
 ```
 
-## j. confusionmaxtrix
+## h. confusionmaxtrix
 
 ```{r confusion, eval=FALSE, include=TRUE}
 confusionMatrix(factor(ml_df$pred), factor(ml_df$target)) 
@@ -572,6 +579,17 @@ confusionMatrix(factor(ml_df$pred2), factor(ml_df$target))
 ```
 
 # 5. conclusion
+
+## a. variable importance
+
+```{r varimp, eval=FALSE, include=TRUE}
+# variable importance
+imp_matrix <- xgb.importance (feature_names = colnames(new_tr),model = xgb_model2)
+xgb.plot.importance(imp_matrix[1:10])
+
+# xgboost tree viz
+xgb.plot.tree(model = xgb_model2, trees = 0, show_node_id = TRUE)
+```
 
 - 
 - 
