@@ -381,6 +381,13 @@ dat <- dat %>% mutate(name = case_when(
 
 ## c. Feature Selction
 
+0. One Hot encoding
+
+```{r encoding}
+mlr::createDummyFeatures(dat)
+# transform and figure out zero-information, duplicate feature
+```
+
 1. method 1 - Correlation plot
 
 ```{r cor, eval=FALSE, include=TRUE}
@@ -525,6 +532,7 @@ total_label <- ml_df$survived
 new_tr <- model.matrix(~.+0, data = train %>% select(-target), with = F)
 new_ts <- model.matrix(~.+0, data = test %>% select(-target), with = F)
 new_total <- model.matrix(~.+0, data = ml_df %>% select(-target), with = F)
+# mlr::createDummyFeatures()
 ```
 
 
