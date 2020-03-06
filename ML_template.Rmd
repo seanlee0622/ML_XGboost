@@ -32,6 +32,11 @@ given name, family name, birth data (age), gender, bank, demographic info, revie
 
 ## a. Load Packages
 ```{r load_library, eval=FALSE, include=TRUE}
+
+devtools::install_github("Prometheus77/ggez")
+devtools::install_github("Prometheus77/ucimlr")
+devtools::install_github("Prometheus77/actools")
+
 # Load the Packages
 
 # loading package
@@ -63,9 +68,18 @@ library(Boruta)
 
 
 # Machine Learning
+library(mlr)
 library(caret)
 library(xgboost)
 library(rattle)
+
+# Progressive Leasing
+
+library(ucimlr)
+library(actools)
+library(mlr)
+
+
 
 # Instant load the packages
 pacman::p_load(data.table, janitor, tidyverse, DataExplorer, naniar, skimr, plotly, corrplot, DT, gridExtra, ggrepel, stringi, lubridate, caret, xgboost, rattle, Boruta)
@@ -275,6 +289,14 @@ Sequences
 ```
 
 ## b. Data Wraglization
+
+
+### 0. number normalization
+
+```{r number_norm}
+# mean : 0, sd = 1
+dat %>% normalizeFeatures()
+```
 
 ### 1. data1 & data2 Joining key
 
@@ -499,7 +521,7 @@ tr_label <- train$survived
 ts_label <- test$survived 
 total_label <- ml_df$survived
 
-# model.matrix
+# model.matrix (One hot encoding)
 new_tr <- model.matrix(~.+0, data = train %>% select(-target), with = F)
 new_ts <- model.matrix(~.+0, data = test %>% select(-target), with = F)
 new_total <- model.matrix(~.+0, data = ml_df %>% select(-target), with = F)
