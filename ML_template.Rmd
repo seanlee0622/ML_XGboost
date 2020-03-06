@@ -12,15 +12,6 @@ output:
     code_folding: hide
 ---
 
-<!-- 1.Objective -->
-<!-- 2. EDA -->
-<!-- 3. Feature Engineering -->
-<!-- 4.Machine Learning -->
-<!-- 5. Conclusion -->
-<!-- Feature Engineering <- Feature Selection, Imputation, Visualization -->
-<!-- EDA structure, type, missing portion -->
-<!-- Feature Engineering Wranglization -->
-
 # 1. Objectives
 
 * 
